@@ -1,0 +1,330 @@
+---
+title: "InitialAnalysis Male"
+author: "Kelly Revering"
+date: "03/11/2021"
+output: html_document
+---
+```{r}
+#complete univariate analysis on the dataset
+diabetes_all <- read.csv("http://archive.ics.uci.edu/ml/machine-learning-databases/00529/diabetes_data_upload.csv")
+str(diabetes_all)
+diabetes_male <- subset(diabetes_all, diabetes_all$Gender=="Male")
+#remove gender column
+diabetes_male <- diabetes_male[,-2]
+
+#age only numerical variable
+summary(diabetes_male$Age)
+male_age_boxplot <- boxplot(diabetes_male$Age)
+male_age_boxplot
+
+```
+
+
+```{r}
+#missing values were already checked for the whole dataset
+
+```
+
+
+```{r}
+#change all categorical variable to factors
+
+diabetes_male$class <- as.factor(diabetes_male$class)
+diabetes_male$Polyuria <- as.factor(diabetes_male$Polyuria)
+diabetes_male$Polydipsia <- as.factor(diabetes_male$Polydipsia)
+diabetes_male$sudden.weight.loss <- as.factor(diabetes_male$sudden.weight.loss)
+diabetes_male$weakness <- as.factor(diabetes_male$weakness)
+diabetes_male$Polyphagia <- as.factor(diabetes_male$Polyphagia)
+diabetes_male$Genital.thrush <- as.factor(diabetes_male$Genital.thrush)
+diabetes_male$visual.blurring <- as.factor(diabetes_male$visual.blurring)
+diabetes_male$Itching <- as.factor(diabetes_male$Itching)
+diabetes_male$Irritability <- as.factor(diabetes_male$Irritability)
+diabetes_male$delayed.healing <- as.factor(diabetes_male$delayed.healing)
+diabetes_male$partial.paresis <- as.factor(diabetes_male$partial.paresis)
+diabetes_male$muscle.stiffness <- as.factor(diabetes_male$muscle.stiffness)
+diabetes_male$Alopecia <- as.factor(diabetes_male$Alopecia)
+diabetes_male$Obesity <- as.factor(diabetes_male$Obesity)
+diabetes_male$class <- as.factor(diabetes_male$class)
+
+str(diabetes_male)
+
+
+```
+
+
+```{r}
+#look at division of class variable
+table(diabetes_male$class)
+
+```
+
+
+```{r}
+#bivariate analysis
+#correlation analysis use Goodman Kruskal because categorical variables
+
+install.packages("GoodmanKruskal")
+library("GoodmanKruskal")
+
+corr_male <- GKtauDataframe(diabetes_male)
+#corr_male_plot <- plot(corr_male)
+corr_male
+#corr_male_plot
+
+
+```
+
+
+```{r}
+
+#look at age distribution
+
+hist_age_male <- hist(diabetes_male$Age)
+
+#group age into levels
+ageGrp <- cut(diabetes_male$Age, c(15,25,35,45,55,65,75,90), labels = c("16-25","26-35","36-45","46-55","56-65","66-75","76+"))
+diabetes_male <- cbind(diabetes_male, ageGrp)
+
+#remove straight age column
+
+dia_male <- diabetes_male[,-1]
+
+```
+
+
+```{r}
+#normalize and scaling can not be done on categorical variables nor can dimension reduction
+
+```
+
+
+```{r}
+#EDM
+#clustering K means
+#because class has two levels, k=2
+#remove class column
+diabetes_input_male <- dia_male [,-15]
+
+#because categorical variables, apply one-hot encoding to cluster
+#install.packages("mltools")
+library("mltools")
+#install.packages("data.table")
+library("data.table")
+
+set.seed(2468)
+
+
+diabetes_input_male <- data.table(diabetes_input_male)
+
+dia_male_one_hot <- one_hot(diabetes_input_male, cols ="auto", dropCols = TRUE)
+
+
+kmeans_male <- kmeans(dia_male_one_hot,2)
+kmeans_male
+
+#look at correspondance to actual values
+
+kmeans_male_table <- table(dia_male$class, kmeans_male$cluster)
+kmeans_male_table
+summary(kmeans_male_table)
+
+#not a very accurate clustering
+
+```
+
+
+```{r}
+#based on results of Kmeans clustering, look at optimum K values
+
+install.packages(c("factoextra","cluster"))
+library("factoextra")
+library("cluster")
+
+fviz_nbclust(dia_male_one_hot, kmeans, method = "wss")
+fviz_nbclust(dia_male_one_hot, kmeans, method = "silhouette")
+fviz_nbclust(dia_male_one_hot, kmeans, method = "gap_stat")
+
+#based on the kmeans confusion matrix and the above results, clustering does not appear to provide reliable analysis
+
+
+
+
+```
+
+
+```{r}
+#decision tree
+
+#sample data to ensure random distribution of class variable
+shuffle_index_male <- sample(1:nrow(dia_male))
+dia_male_dt <- dia_male[shuffle_index_male,]
+
+#create train/test sets
+set.seed(3692)
+index_male <- sample(1:nrow(dia_male_dt),0.7*nrow(dia_male_dt))
+train_male <- dia_male_dt[index_male,]
+test_male <- dia_male_dt[-index_male,]
+
+#check to see distribution of class variable in training set
+prop.table(table(train_male$class))
+prop.table(table(test_male$class))
+#correlates to the original class balance in the original dataset
+
+
+install.packages("rpart.plot")
+library("rpart.plot")
+
+fit_male <- rpart(class~., data = train_male, method = "class")
+rpart.plot(fit_male, extra = 106)
+
+predict_male <- predict(fit_male,test_male,type="class")
+#compare prediction to actual
+predTable_male <- table(test_male$class, predict_male)
+predTable_male
+
+
+
+
+
+
+
+```
+```{r}
+#calculate metrics of decision tree
+acc_dt_male <- sum(48+37)/sum(48+11+3+37)
+pre_dt_male <- 37/sum(37+3)
+sen_dt_male <- 37/sum(37+11)
+paste("Accuracy: ", acc_dt_male)
+paste("Precision: ", pre_dt_male)
+paste("Sensitivity: ", sen_dt_male)
+
+
+
+
+```
+
+
+```{r}
+#naives bayes analysis
+#variables are not strongly correlated so good candidate for this classifier
+#outcome variable is already a factor with two levels
+#install.packages("e1071")
+library("e1071")
+#use same train and testing datasets 
+
+
+set.seed(4836)
+nb_model_male <- naiveBayes(class~., data = train_male)
+nb_model_male
+
+nb_male_predict <- predict(nb_model_male, test_male)
+
+table(nb_male_predict, test_male$class)
+```
+```{r}
+#calculate metrics of naives bayes
+acc_nb_male <- sum(50+37)/sum(50+37+3+9)
+pre_nb_male <- 37/sum(37+9)
+sen_nb_male <- 37/sum(37+3)
+paste("Accuracy: ", acc_nb_male)
+paste("Precision: ", pre_nb_male)
+paste("Sensitivity: ", sen_nb_male)
+
+
+```
+
+
+```{r}
+#logistical regression
+#use same train and test data
+#perform one-hot encoding to train/test data because linear regression cannot be levels
+
+install.packages("mltools")
+library("mltools")
+install.packages("data.table")
+library("data.table")
+
+train_male_hot <- data.table(train_male)
+train_male_log <- one_hot(train_male_hot, cols = "auto", dropCols = TRUE)
+train_male_log <- as.data.frame(train_male_log)
+train_male_log <- train_male_log[,c(31:37)]
+
+#use one hot encoding for ageGrp variable but assign 1's and 0's for other variables
+
+train_male_log$uris_num <- ifelse(train_male$Polyuria=="No", 0,1)
+train_male_log$dipsia_num <- ifelse(train_male$Polydipsia=="No", 0,1)
+train_male_log$weight_num <- ifelse(train_male$sudden.weight.loss=="No", 0,1)
+train_male_log$weak_num <- ifelse(train_male$weakness=="No", 0,1)
+train_male_log$phagia_num <- ifelse(train_male$Polyphagia=="No", 0,1)
+train_male_log$gt_num <- ifelse(train_male$Genital.thrush=="No", 0,1)
+train_male_log$vb_num <- ifelse(train_male$visual.blurring=="No", 0,1)
+train_male_log$itch_num <- ifelse(train_male$Itching=="No", 0,1)
+train_male_log$irrit_num <- ifelse(train_male$Irritability=="No", 0,1)
+train_male_log$dh_num <- ifelse(train_male$delayed.healing=="No", 0,1)
+train_male_log$pp_num <- ifelse(train_male$partial.paresis=="No", 0,1)
+train_male_log$al_num <- ifelse(train_male$Alopecia=="No", 0,1)
+train_male_log$obe_num <- ifelse(train_male$Obesity=="No", 0,1)
+train_male_log$class <- ifelse(train_male$class=="Negative", 0,1)
+
+linreg_male <- lm(class~., data = train_male_log)
+summary(linreg_male)
+
+
+```
+
+```{r}
+#use linear model to predict the test dataframe
+#convert test data to same as train 
+install.packages("mltools")
+library("mltools")
+install.packages("data.table")
+library("data.table")
+
+test_male_hot <- data.table(test_male)
+test_male_log <- one_hot(test_male_hot, cols = "auto", dropCols = TRUE)
+test_male_log <- as.data.frame(test_male_log)
+test_male_log <- test_male_log[,c(31:37)]
+
+#use one hot encoding for ageGrp variable but assign 1's and 0's for other variables
+
+test_male_log$uris_num <- ifelse(test_male$Polyuria=="No", 0,1)
+test_male_log$dipsia_num <- ifelse(test_male$Polydipsia=="No", 0,1)
+test_male_log$weight_num <- ifelse(test_male$sudden.weight.loss=="No", 0,1)
+test_male_log$weak_num <- ifelse(test_male$weakness=="No", 0,1)
+test_male_log$phagia_num <- ifelse(test_male$Polyphagia=="No", 0,1)
+test_male_log$gt_num <- ifelse(test_male$Genital.thrush=="No", 0,1)
+test_male_log$vb_num <- ifelse(test_male$visual.blurring=="No", 0,1)
+test_male_log$itch_num <- ifelse(test_male$Itching=="No", 0,1)
+test_male_log$irrit_num <- ifelse(test_male$Irritability=="No", 0,1)
+test_male_log$dh_num <- ifelse(test_male$delayed.healing=="No", 0,1)
+test_male_log$pp_num <- ifelse(test_male$partial.paresis=="No", 0,1)
+test_male_log$al_num <- ifelse(test_male$Alopecia=="No", 0,1)
+test_male_log$obe_num <- ifelse(test_male$Obesity=="No", 0,1)
+test_male_log$class <- ifelse(test_male$class=="Negative", 0,1)
+
+pred_lm_male <- predict(linreg_male, newdata = test_male_log, interval = "prediction")
+summary(pred_lm_male)
+```
+
+
+
+```{r}
+
+#analysis results of linear regression
+errors_male <- pred_lm_male[,"fit"] - test_male_log$class
+
+hist(errors_male)
+
+rmse_male <- sqrt(sum((pred_lm_male[,"fit"]-test_male_log$class)^2)/nrow(test_male_log))
+rel_change_male <- 1-((test_male_log$class -abs(errors_male))/test_male_log$class)
+pred25_male <- table(rel_change_male <0.25)["TRUE"]/nrow(test_male_log)
+
+rmse_male
+pred25_male
+```
+
+
+```{r}
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

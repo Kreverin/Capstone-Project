@@ -1,0 +1,348 @@
+---
+title: "InitialAnalysis"
+author: "Kelly Revering"
+date: "03/11/2021"
+output: html_document
+---
+```{r}
+#complete univariate analysis on the dataset
+diabetes_all <- read.csv("http://archive.ics.uci.edu/ml/machine-learning-databases/00529/diabetes_data_upload.csv")
+str(diabetes_all)
+
+#age only numerical variable
+summary(diabetes_all$Age)
+age_boxplot <- boxplot(diabetes_all$Age)
+age_boxplot
+
+```
+
+
+```{r}
+#check for missing values
+sum(is.na(diabetes_all$Age))
+sum(is.na(diabetes_all$Gender))
+sum(is.na(diabetes_all$Polyuria))
+sum(is.na(diabetes_all$Polydipsia))
+sum(is.na(diabetes_all$sudden.weight.loss))
+sum(is.na(diabetes_all$weakness))
+sum(is.na(diabetes_all$Polyphagia))
+sum(is.na(diabetes_all$Genital.thrush))
+sum(is.na(diabetes_all$visual.blurring))
+sum(is.na(diabetes_all$Itching))
+sum(is.na(diabetes_all$Irritability))
+sum(is.na(diabetes_all$delayed.healing))
+sum(is.na(diabetes_all$partial.paresis))
+sum(is.na(diabetes_all$muscle.stiffness))
+sum(is.na(diabetes_all$Alopecia))
+sum(is.na(diabetes_all$Obesity))
+sum(is.na(diabetes_all$class))
+sum(is.na(diabetes_all$Age))
+
+```
+
+
+```{r}
+#change all categorical variable to factors
+
+diabetes_all$class <- as.factor(diabetes_all$class)
+diabetes_all$Gender <- as.factor(diabetes_all$Gender)
+diabetes_all$Polyuria <- as.factor(diabetes_all$Polyuria)
+diabetes_all$Polydipsia <- as.factor(diabetes_all$Polydipsia)
+diabetes_all$sudden.weight.loss <- as.factor(diabetes_all$sudden.weight.loss)
+diabetes_all$weakness <- as.factor(diabetes_all$weakness)
+diabetes_all$Polyphagia <- as.factor(diabetes_all$Polyphagia)
+diabetes_all$Genital.thrush <- as.factor(diabetes_all$Genital.thrush)
+diabetes_all$visual.blurring <- as.factor(diabetes_all$visual.blurring)
+diabetes_all$Itching <- as.factor(diabetes_all$Itching)
+diabetes_all$Irritability <- as.factor(diabetes_all$Irritability)
+diabetes_all$delayed.healing <- as.factor(diabetes_all$delayed.healing)
+diabetes_all$partial.paresis <- as.factor(diabetes_all$partial.paresis)
+diabetes_all$muscle.stiffness <- as.factor(diabetes_all$muscle.stiffness)
+diabetes_all$Alopecia <- as.factor(diabetes_all$Alopecia)
+diabetes_all$Obesity <- as.factor(diabetes_all$Obesity)
+diabetes_all$class <- as.factor(diabetes_all$class)
+
+str(diabetes_all)
+
+
+```
+
+
+```{r}
+#look at division of class variable
+table(diabetes_all$class)
+table(diabetes_all$Gender)
+
+```
+
+
+```{r}
+#bivariate analysis
+#correlation analysis use Goodman Kruskal because categorical variables
+install.packages("GoodmanKruskal")
+library("GoodmanKruskal")
+GKtau(diabetes_all$class, diabetes_all$Gender)
+corr_all <- GKtauDataframe(diabetes_all)
+corr_all_plot <- plot(corr_all)
+corr_all
+corr_all_plot
+
+
+
+
+```
+
+
+```{r}
+
+#look at age distribution
+
+hist_age <- hist(diabetes_all$Age)
+#mediam is 47.5
+
+#group age into levels
+ageGrp <- cut(diabetes_all$Age, c(15,25,35,45,55,65,75,90), labels = c("16-25","26-35","36-45","46-55","56-65","66-75","76+"))
+diabetes_all <- cbind(diabetes_all, ageGrp)
+
+#remove straight age column
+
+dia_all <- diabetes_all[,-1]
+
+```
+
+
+```{r}
+#normalize and scaling can not be done on categorical variables nor can dimension reduction
+
+```
+
+
+```{r}
+#EDM
+#clustering K means
+#because class has two levels, k=2
+#remove class column
+diabetes_input_all <- dia_all[,-16]
+
+#because categorical variables, apply one-hot encoding to cluster
+#install.packages("mltools")
+library("mltools")
+#install.packages("data.table")
+library("data.table")
+
+set.seed(9876)
+
+diabetes_input_all <- data.table(diabetes_input_all)
+
+dia_all_one_hot <- one_hot(diabetes_input_all, cols ="auto", dropCols = TRUE, sparsifyNAs = TRUE)
+
+
+kmeans_all <- kmeans(dia_all_one_hot, 2)
+kmeans_all
+
+table(dia_all$class, kmeans_all$cluster)
+
+
+
+#look at correspondance to actual values
+
+kmeans_all_table <- table(dia_all$class, kmeans_all$cluster)
+summary(kmeans_all_table)
+
+
+```
+
+
+```{r}
+#based on results of Kmeans clustering, look at optimum K values
+
+install.packages(c("factoextra","cluster"))
+library("factoextra")
+library("cluster")
+
+fviz_nbclust(dia_all_one_hot, kmeans, method = "wss")
+fviz_nbclust(dia_all_one_hot, kmeans, method = "silhouette")
+fviz_nbclust(dia_all_one_hot, kmeans, method = "gap_stat")
+
+#the elbow looks like an optimum k value around 4/5, siholuette is 2 while gap_stat did not acutally converge
+#based on the kmeans confusion matrix and the above results, clustering does not appear to provdie reliable analysis
+
+
+
+
+
+```
+
+
+```{r}
+#decision tree
+
+#sample data to ensure random distribution of class variable
+shuffle_index_all <- sample(1:nrow(dia_all))
+dia_all_dt <- dia_all[shuffle_index_all,]
+
+#create train/test sets
+set.seed(3692)
+index <- sample(1:nrow(dia_all_dt),0.7*nrow(dia_all_dt))
+train_all <- dia_all_dt[index,]
+test_all <- dia_all_dt[-index,]
+
+#check to see distribution of class variable in training set
+prop.table(table(train_all$class))
+prop.table(table(test_all$class))
+#correlates to the original class balance in the original dataset
+
+
+install.packages("rpart.plot")
+library("rpart.plot")
+
+fit_all <- rpart(class~., data = train_all, method = "class")
+rpart.plot(fit_all, extra = 106)
+
+predict_all <- predict(fit_all,test_all,type="class")
+#compare prediction to actual
+predTable_all <- table(test_all$class, predict_all)
+predTable_all
+
+
+
+
+```
+```{r}
+#calculate metrics of decision tree
+acc_dt_all <- sum(52+88)/sum(52+7+9+88)
+pre_dt_all <- 88/sum(88+9)
+sen_dt_all <- 88/sum(88+7)
+paste("Accuracy: ", acc_dt_all)
+paste("Precision: ", pre_dt_all)
+paste("Sensitivity: ", sen_dt_all)
+
+
+
+```
+
+
+```{r}
+#naives bayes analysis
+#variables are not strongly correlated so good candidate for this classifier
+#outcome variable is already a factor with two levels
+#install.packages("e1071")
+library("e1071")
+#use same train and testing datasets 
+
+
+set.seed(4836)
+nb_model_all <- naiveBayes(class~., data = train_all)
+nb_model_all
+
+nb_all_predict <- predict(nb_model_all, test_all)
+
+table(nb_all_predict, test_all$class)
+```
+
+```{r}
+
+#calculate metrics of naives bayes
+acc_nb_all <- sum(52+87)/sum(52+87+10+7)
+pre_nb_all <- 87/sum(87+7)
+sen_nb_all <- 87/sum(87+10)
+paste("Accuracy: ", acc_nb_all)
+paste("Precision: ", pre_nb_all)
+paste("Sensitivity: ", sen_nb_all)
+
+
+
+```
+
+```{r}
+#logistical regression
+#use same train and test data
+#perform one-hot encoding to train/test data because linear regression cannot be levels
+
+install.packages("mltools")
+library("mltools")
+install.packages("data.table")
+library("data.table")
+
+train_all_hot <- data.table(train_all)
+train_all_log <- one_hot(train_all_hot, cols = "auto", dropCols = TRUE)
+train_all_log <- as.data.frame(train_all_log)
+train_all_log <- train_all_log[,c(33:39)]
+
+#use one hot encoding for ageGrp variable but assign 1's and 0's for other variables
+train_all_log$gender_num <- ifelse(train_all$Gender=="Male", 0,1)
+train_all_log$uris_num <- ifelse(train_all$Polyuria=="No", 0,1)
+train_all_log$dipsia_num <- ifelse(train_all$Polydipsia=="No", 0,1)
+train_all_log$weight_num <- ifelse(train_all$sudden.weight.loss=="No", 0,1)
+train_all_log$weak_num <- ifelse(train_all$weakness=="No", 0,1)
+train_all_log$phagia_num <- ifelse(train_all$Polyphagia=="No", 0,1)
+train_all_log$gt_num <- ifelse(train_all$Genital.thrush=="No", 0,1)
+train_all_log$vb_num <- ifelse(train_all$visual.blurring=="No", 0,1)
+train_all_log$itch_num <- ifelse(train_all$Itching=="No", 0,1)
+train_all_log$irrit_num <- ifelse(train_all$Irritability=="No", 0,1)
+train_all_log$dh_num <- ifelse(train_all$delayed.healing=="No", 0,1)
+train_all_log$pp_num <- ifelse(train_all$partial.paresis=="No", 0,1)
+train_all_log$al_num <- ifelse(train_all$Alopecia=="No", 0,1)
+train_all_log$obe_num <- ifelse(train_all$Obesity=="No", 0,1)
+train_all_log$class <- ifelse(train_all$class=="Negative", 0,1)
+
+linreg_all <- lm(class~., data = train_all_log)
+summary(linreg_all)
+
+
+```
+
+```{r}
+#use linear model to predict the test dataframe
+#convert test data to same as train 
+install.packages("mltools")
+library("mltools")
+install.packages("data.table")
+library("data.table")
+
+test_all_hot <- data.table(test_all)
+test_all_log <- one_hot(test_all_hot, cols = "auto", dropCols = TRUE)
+test_all_log <- as.data.frame(test_all_log)
+test_all_log <- test_all_log[,c(33:39)]
+
+#use one hot encoding for ageGrp variable but assign 1's and 0's for other variables
+test_all_log$gender_num <- ifelse(test_all$Gender=="Male", 0,1)
+test_all_log$uris_num <- ifelse(test_all$Polyuria=="No", 0,1)
+test_all_log$dipsia_num <- ifelse(test_all$Polydipsia=="No", 0,1)
+test_all_log$weight_num <- ifelse(test_all$sudden.weight.loss=="No", 0,1)
+test_all_log$weak_num <- ifelse(test_all$weakness=="No", 0,1)
+test_all_log$phagia_num <- ifelse(test_all$Polyphagia=="No", 0,1)
+test_all_log$gt_num <- ifelse(test_all$Genital.thrush=="No", 0,1)
+test_all_log$vb_num <- ifelse(test_all$visual.blurring=="No", 0,1)
+test_all_log$itch_num <- ifelse(test_all$Itching=="No", 0,1)
+test_all_log$irrit_num <- ifelse(test_all$Irritability=="No", 0,1)
+test_all_log$dh_num <- ifelse(test_all$delayed.healing=="No", 0,1)
+test_all_log$pp_num <- ifelse(test_all$partial.paresis=="No", 0,1)
+test_all_log$al_num <- ifelse(test_all$Alopecia=="No", 0,1)
+test_all_log$obe_num <- ifelse(test_all$Obesity=="No", 0,1)
+test_all_log$class <- ifelse(test_all$class=="Negative", 0,1)
+
+pred_lm_all <- predict(linreg_all, newdata = test_all_log, interval = "prediction")
+summary(pred_lm_all)
+
+
+```
+
+
+
+```{r}
+#analysis results of linear regression
+errors_all <- pred_lm_all[,"fit"] - test_all_log$class
+
+hist(errors_all)
+
+rmse_all <- sqrt(sum((pred_lm_all[,"fit"]-test_all_log$class)^2)/nrow(test_all_log))
+rel_change_all <- 1-((test_all_log$class -abs(errors_all))/test_all_log$class)
+pred25_all <- table(rel_change_all<0.25)["TRUE"]/nrow(test_all_log)
+
+rmse_all
+pred25_all
+```
+
+
+```{r}

@@ -1,0 +1,333 @@
+---
+title: "InitialAnalysis Female
+author: "Kelly Revering"
+date: "03/11/2021"
+output: html_document
+---
+```{r}
+#complete univariate analysis on the dataset
+diabetes_all <- read.csv("http://archive.ics.uci.edu/ml/machine-learning-databases/00529/diabetes_data_upload.csv")
+str(diabetes_all)
+diabetes_female <- subset(diabetes_all, diabetes_all$Gender=="Female")
+diabetes_female <- diabetes_female[,-2]
+
+#age only numerical variable
+summary(diabetes_female$Age)
+female_age_boxplot <- boxplot(diabetes_female$Age)
+female_age_boxplot
+
+```
+
+
+```{r}
+#missing values were already checked for the whole dataset
+
+```
+
+
+```{r}
+#change all categorical variable to factors
+
+diabetes_female$class <- as.factor(diabetes_female$class)
+diabetes_female$Polyuria <- as.factor(diabetes_female$Polyuria)
+diabetes_female$Polydipsia <- as.factor(diabetes_female$Polydipsia)
+diabetes_female$sudden.weight.loss <- as.factor(diabetes_female$sudden.weight.loss)
+diabetes_female$weakness <- as.factor(diabetes_female$weakness)
+diabetes_female$Polyphagia <- as.factor(diabetes_female$Polyphagia)
+diabetes_female$Genital.thrush <- as.factor(diabetes_female$Genital.thrush)
+diabetes_female$visual.blurring <- as.factor(diabetes_female$visual.blurring)
+diabetes_female$Itching <- as.factor(diabetes_female$Itching)
+diabetes_female$Irritability <- as.factor(diabetes_female$Irritability)
+diabetes_female$delayed.healing <- as.factor(diabetes_female$delayed.healing)
+diabetes_female$partial.paresis <- as.factor(diabetes_female$partial.paresis)
+diabetes_female$muscle.stiffness <- as.factor(diabetes_female$muscle.stiffness)
+diabetes_female$Alopecia <- as.factor(diabetes_female$Alopecia)
+diabetes_female$Obesity <- as.factor(diabetes_female$Obesity)
+diabetes_female$class <- as.factor(diabetes_female$class)
+
+str(diabetes_female)
+
+
+```
+
+
+```{r}
+#look at division of class variable
+table(diabetes_female$class)
+
+```
+
+
+```{r}
+#bivariate analysis
+#correlation analysis use Goodman Kruskal because categorical variables
+
+install.packages("GoodmanKruskal")
+library("GoodmanKruskal")
+
+corr_female <- GKtauDataframe(diabetes_female)
+#corr_female_plot <- plot(corr_male)
+corr_female
+#corr_female_plot
+
+
+```
+
+
+```{r}
+
+#look at age distribution
+
+hist_age_female <- hist(diabetes_female$Age)
+
+#group age into levels
+ageGrp <- cut(diabetes_female$Age, c(15,25,35,45,55,65,75,90), labels = c("16-25","26-35","36-45","46-55","56-65","66-75","76+"))
+diabetes_female <- cbind(diabetes_female, ageGrp)
+
+#remove straight age column
+
+dia_female <- diabetes_female[,-1]
+
+```
+
+
+```{r}
+#normalize and scaling can not be done on categorical variables nor can dimension reduction
+
+```
+
+
+```{r}
+#EDM
+#clustering K means
+#because class has two levels, k=2
+#remove class column
+diabetes_input_female <- dia_female [,-15]
+
+#because categorical variables, apply one-hot encoding to cluster
+#install.packages("mltools")
+library("mltools")
+#install.packages("data.table")
+library("data.table")
+
+set.seed(2468)
+
+
+diabetes_input_female <- data.table(diabetes_input_female)
+
+dia_female_one_hot <- one_hot(diabetes_input_female, cols ="auto", dropCols = TRUE)
+
+
+kmeans_female <- kmeans(dia_female_one_hot,2)
+kmeans_female
+
+#look at correspondance to actual values
+
+kmeans_female_table <- table(dia_female$class, kmeans_female$cluster)
+kmeans_female_table
+summary(kmeans_female_table)
+
+#not a very accurate clustering
+
+```
+
+
+```{r}
+#based on results of Kmeans clustering, look at optimum K values
+
+install.packages(c("factoextra","cluster"))
+library("factoextra")
+library("cluster")
+
+fviz_nbclust(dia_female_one_hot, kmeans, method = "wss")
+fviz_nbclust(dia_female_one_hot, kmeans, method = "silhouette")
+fviz_nbclust(dia_female_one_hot, kmeans, method = "gap_stat")
+
+#based on the kmeans confusion matrix and the above results, clustering does not appear to provide reliable analysis
+
+
+
+
+```
+
+
+```{r}
+#decision tree
+
+#sample data to ensure random distribution of class variable
+shuffle_index_female <- sample(1:nrow(dia_female))
+dia_female_dt <- dia_female[shuffle_index_female,]
+
+#create train/test sets
+set.seed(1485)
+index_female <- sample(1:nrow(dia_female_dt),0.7*nrow(dia_female_dt))
+train_female <- dia_female_dt[index_female,]
+test_female <- dia_female_dt[-index_female,]
+
+#check to see distribution of class variable in training set
+prop.table(table(train_female$class))
+prop.table(table(test_female$class))
+#correlates to the original class balance in the original dataset
+
+
+install.packages("rpart.plot")
+library("rpart.plot")
+
+fit_female <- rpart(class~., data = train_female, method = "class")
+rpart.plot(fit_female, extra = 106)
+
+predict_female <- predict(fit_female,test_female,type="class")
+#compare prediction to actual
+predTable_female <- table(test_female$class, predict_female)
+predTable_female
+
+
+
+
+
+
+
+```
+```{r}
+#calculate metrics of decision tree
+acc_dt_female <- sum(52+2)/sum(52+2+2+2)
+pre_dt_female <- 52/sum(52+2)
+sen_dt_female <- 52/sum(52+2)
+paste("Accuracy: ", acc_dt_female)
+paste("Precision: ", pre_dt_female)
+paste("Sensitivity: ", sen_dt_female)
+
+
+
+
+```
+
+
+```{r}
+#naives bayes analysis
+#variables are not strongly correlated so good candidate for this classifier
+#outcome variable is already a factor with two levels
+#install.packages("e1071")
+library("e1071")
+#use same train and testing datasets 
+
+
+set.seed(4836)
+nb_model_female <- naiveBayes(class~., data = train_female)
+nb_model_female
+
+nb_female_predict <- predict(nb_model_female, test_female)
+
+table(nb_female_predict, test_female$class)
+```
+```{r}
+#calculate metrics of naives bayes
+acc_nb_female <- sum(52+4)/sum(52+4+0+2)
+pre_nb_female <- 52/sum(52+0)
+sen_nb_female <- 52/sum(52+2)
+paste("Accuracy: ", acc_nb_female)
+paste("Precision: ", pre_nb_female)
+paste("Sensitivity: ", sen_nb_female)
+
+
+```
+
+
+```{r}
+#logistical regression
+#use same train and test data
+#perform one-hot encoding to train/test data because linear regression cannot be levels
+
+install.packages("mltools")
+library("mltools")
+install.packages("data.table")
+library("data.table")
+
+train_female_hot <- data.table(train_female)
+train_female_log <- one_hot(train_female_hot, cols = "auto", dropCols = TRUE)
+train_female_log <- as.data.frame(train_female_log)
+train_female_log <- train_female_log[,c(31:37)]
+
+#use one hot encoding for ageGrp variable but assign 1's and 0's for other variables
+
+train_female_log$uris_num <- ifelse(train_female$Polyuria=="No", 0,1)
+train_female_log$dipsia_num <- ifelse(train_female$Polydipsia=="No", 0,1)
+train_female_log$weight_num <- ifelse(train_female$sudden.weight.loss=="No", 0,1)
+train_female_log$weak_num <- ifelse(train_female$weakness=="No", 0,1)
+train_female_log$phagia_num <- ifelse(train_female$Polyphagia=="No", 0,1)
+train_female_log$gt_num <- ifelse(train_female$Genital.thrush=="No", 0,1)
+train_female_log$vb_num <- ifelse(train_female$visual.blurring=="No", 0,1)
+train_female_log$itch_num <- ifelse(train_female$Itching=="No", 0,1)
+train_female_log$irrit_num <- ifelse(train_female$Irritability=="No", 0,1)
+train_female_log$dh_num <- ifelse(train_female$delayed.healing=="No", 0,1)
+train_female_log$pp_num <- ifelse(train_female$partial.paresis=="No", 0,1)
+train_female_log$al_num <- ifelse(train_female$Alopecia=="No", 0,1)
+train_female_log$obe_num <- ifelse(train_female$Obesity=="No", 0,1)
+train_female_log$class <- ifelse(train_female$class=="Negative", 0,1)
+
+linreg_female <- lm(class~., data = train_female_log)
+summary(linreg_female)
+
+
+```
+
+```{r}
+#use linear model to predict the test dataframe
+#convert test data to same as train 
+install.packages("mltools")
+library("mltools")
+install.packages("data.table")
+library("data.table")
+
+test_female_hot <- data.table(test_female)
+test_female_log <- one_hot(test_female_hot, cols = "auto", dropCols = TRUE)
+test_female_log <- as.data.frame(test_female_log)
+test_female_log <- test_female_log[,c(31:37)]
+
+#use one hot encoding for ageGrp variable but assign 1's and 0's for other variables
+
+test_female_log$uris_num <- ifelse(test_female$Polyuria=="No", 0,1)
+test_female_log$dipsia_num <- ifelse(test_female$Polydipsia=="No", 0,1)
+test_female_log$weight_num <- ifelse(test_female$sudden.weight.loss=="No", 0,1)
+test_female_log$weak_num <- ifelse(test_female$weakness=="No", 0,1)
+test_female_log$phagia_num <- ifelse(test_female$Polyphagia=="No", 0,1)
+test_female_log$gt_num <- ifelse(test_female$Genital.thrush=="No", 0,1)
+test_female_log$vb_num <- ifelse(test_female$visual.blurring=="No", 0,1)
+test_female_log$itch_num <- ifelse(test_female$Itching=="No", 0,1)
+test_female_log$irrit_num <- ifelse(test_female$Irritability=="No", 0,1)
+test_female_log$dh_num <- ifelse(test_female$delayed.healing=="No", 0,1)
+test_female_log$pp_num <- ifelse(test_female$partial.paresis=="No", 0,1)
+test_female_log$al_num <- ifelse(test_female$Alopecia=="No", 0,1)
+test_female_log$obe_num <- ifelse(test_female$Obesity=="No", 0,1)
+test_female_log$class <- ifelse(test_female$class=="Negative", 0,1)
+
+pred_lm_female <- predict(linreg_female, newdata = test_female_log, interval = "prediction")
+summary(pred_lm_female)
+```
+
+
+
+```{r}
+
+#analysis results of linear regression
+errors_female <- pred_lm_female[,"fit"] - test_female_log$class
+
+hist(errors_female)
+
+rmse_female <- sqrt(sum((pred_lm_female[,"fit"]-test_female_log$class)^2)/nrow(test_female_log))
+rel_change_female <- 1-((test_female_log$class -abs(errors_female))/test_female_log$class)
+pred25_female <- table(rel_change_female <0.25)["TRUE"]/nrow(test_female_log)
+
+rmse_female
+pred25_female
+```
+
+
+```
+
+
+```{r}
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
